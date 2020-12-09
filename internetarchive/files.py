@@ -206,6 +206,13 @@ class File(BaseFile):
         self.item.session.mount_http_adapter(max_retries=retries)
         file_path = self.name if not file_path else file_path
 
+        archive_filename = '_archive.txt'
+        if not os.path.exists(archive_filename):
+            with open(archive_filename, 'wt', encoding='utf-8') as f:
+                pass
+        with open(archive_filename, 'rt', encoding='utf-8') as f:
+            archive_data = f.read().splitlines()
+
         if destdir:
             if not os.path.exists(destdir) and return_responses is not True:
                 os.mkdir(destdir)
@@ -213,7 +220,7 @@ class File(BaseFile):
                 raise IOError('{} is not a directory!'.format(destdir))
             file_path = os.path.join(destdir, file_path)
 
-        if not return_responses and os.path.exists(file_path.encode('utf-8')):
+        if not return_responses and (os.path.exists(file_path.encode('utf-8')) or file_path in archive_data):
             if ignore_existing:
                 msg = 'skipping {0}, file already exists.'.format(file_path)
                 log.info(msg)
@@ -224,6 +231,18 @@ class File(BaseFile):
                     sys.stdout.flush()
                 return
             elif checksum:
+                # bypass checksum check if already checked on previous run
+                if file_path in archive_data:
+                    msg = ('skipping {0}, '
+                           'file already exists based on previous checksum.'.format(file_path))
+                    log.info(msg)
+                    if verbose:
+                        print(' ' + msg)
+                    elif silent is False:
+                        print('-', end='')
+                        sys.stdout.flush()
+                    return
+                
                 with open(file_path, 'rb') as fp:
                     md5_sum = utils.get_md5(fp)
 
@@ -236,6 +255,9 @@ class File(BaseFile):
                     elif silent is False:
                         print('.', end='')
                         sys.stdout.flush()
+                    # add file to archive to skip it next time
+                    with open(archive_filename, 'a', encoding='utf-8') as f:
+                        f.write('{}\n'.format(file_path))
                     return
             else:
                 st = os.stat(file_path.encode('utf-8'))
