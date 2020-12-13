@@ -40,9 +40,7 @@ options:
     -P, --search-parameters=<key:value>...   Download items returned from a specified search query.
     -g, --glob=<pattern>                     Only download files whose filename matches the
                                              given glob pattern.
-    -f, --format=<format>...                 Only download files of the specified format.
-                                             Use this option multiple times to download multiple
-                                             formats.
+    -f, --format=<format>...                 Only download files of the specified format(s).
                                              You can use the following command to retrieve
                                              a list of file formats contained within a given
                                              item:
@@ -148,6 +146,10 @@ def main(argv, session):
         else:
             identifier = args['<identifier>']
             files = args['<file>']
+            file_with_files_to_download = 'to_download.txt'
+            if not files and os.path.exists(file_with_files_to_download):
+                with open(file_with_files_to_download, 'rt', encoding='utf-8') as f:
+                    files = f.read().splitlines()
         total_ids = 1
         ids = [identifier]
     elif args['<identifier>'] == '-':
