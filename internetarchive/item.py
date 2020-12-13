@@ -53,7 +53,7 @@ from internetarchive.utils import IdentifierListAsItems, get_md5, chunk_generato
 from internetarchive.files import File
 from internetarchive.iarequest import MetadataRequest, S3Request
 from internetarchive.auth import S3Auth
-from internetarchive.utils import get_s3_xml_text, get_file_size, is_dir, validate_s3_identifier
+from internetarchive.utils import get_s3_xml_text, get_file_size, is_dir
 
 log = getLogger(__name__)
 
@@ -739,6 +739,22 @@ class Item(BaseItem):
             else:
                 print(' - success')
 
+        # send result to slack
+        slack_webhook_file = 'slack_webhook.txt'
+        if os.path.exists(slack_webhook_file):
+            with open(slack_webhook_file, 'rt', encoding='utf-8') as f:
+                slack_webhook_data = f.read().splitlines()
+            if slack_webhook_data:
+                slack_webhook = slack_webhook_data[0]
+            from slack_webhook import Slack
+            if errors:
+                end_status = 'errors'
+            else:
+                end_status = 'success'
+            slack_message = 'Internet Archive download finished with'
+            slack = Slack(url=slack_webhook)
+            slack.post(text='{} {}.'.format(slack_message, end_status))
+
         if return_responses:
             return responses
         else:
@@ -859,7 +875,6 @@ class Item(BaseItem):
                     retries=None,
                     retries_sleep=None,
                     debug=None,
-                    validate_identifier=None,
                     request_kwargs=None):
         """Upload a single file to an item. The item will be created
         if it does not exist.
@@ -911,10 +926,6 @@ class Item(BaseItem):
         :param debug: (optional) Set to True to print headers to stdout, and
                       exit without sending the upload request.
 
-        :type validate_identifier: bool
-        :param validate_identifier: (optional) Set to True to validate the identifier before
-                                    uploading the file.
-
         Usage::
 
             >>> import internetarchive
@@ -938,7 +949,6 @@ class Item(BaseItem):
         retries = 0 if retries is None else retries
         retries_sleep = 30 if retries_sleep is None else retries_sleep
         debug = False if debug is None else debug
-        validate_identifier = False if validate_identifier is None else validate_identifier
         request_kwargs = {} if request_kwargs is None else request_kwargs
         if 'timeout' not in request_kwargs:
             request_kwargs['timeout'] = 120
@@ -965,8 +975,6 @@ class Item(BaseItem):
             _headers['x-archive-size-hint'] = str(size)
 
         # Build IA-S3 URL.
-        if validate_identifier:
-            validate_s3_identifier(self.identifier)
         key = norm_filepath(filename).split('/')[-1] if key is None else key
         base_url = '{0.session.protocol}//s3.us.archive.org/{0.identifier}'.format(self)
         url = '{0}/{1}'.format(
@@ -1120,7 +1128,6 @@ class Item(BaseItem):
                retries=None,
                retries_sleep=None,
                debug=None,
-               validate_identifier=None,
                request_kwargs=None):
         """Upload files to an item. The item will be created if it
         does not exist.
@@ -1227,7 +1234,6 @@ class Item(BaseItem):
                                             retries=retries,
                                             retries_sleep=retries_sleep,
                                             debug=debug,
-                                            validate_identifier=validate_identifier,
                                             request_kwargs=request_kwargs)
                     responses.append(resp)
             else:
@@ -1261,7 +1267,6 @@ class Item(BaseItem):
                                         retries=retries,
                                         retries_sleep=retries_sleep,
                                         debug=debug,
-                                        validate_identifier=validate_identifier,
                                         request_kwargs=request_kwargs)
                 responses.append(resp)
         return responses
